@@ -2,11 +2,7 @@ import { prisma } from "../../../shared/prisma";
 import { tenantService } from "../tenant.service";
 
 export const runbookService = {
-  async create(
-    organizationId: string,
-    userId: string,
-    data: Record<string, unknown>,
-  ) {
+  async create(organizationId: string, userId: string, data: Record<string, unknown>) {
     const serviceId = data.serviceId ? String(data.serviceId) : undefined;
 
     if (serviceId) {
@@ -67,12 +63,7 @@ export const runbookService = {
     return runbook;
   },
 
-  async update(
-    id: string,
-    organizationId: string,
-    userId: string,
-    data: Record<string, unknown>,
-  ) {
+  async update(id: string, organizationId: string, userId: string, data: Record<string, unknown>) {
     await this.get(id, organizationId, userId);
     const { serviceId: _serviceId, createdById: _createdById, ...updates } = data;
 

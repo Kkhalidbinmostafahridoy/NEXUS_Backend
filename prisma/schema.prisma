@@ -265,11 +265,14 @@ model Runbook {
 }
 
 model Document {
-  id        String   @id @default(cuid())
-  title     String
-  content   String
-  sourceUrl String?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String?
+  title          String
+  content        String
+  sourceUrl      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
 }
 
 model SloDefinition {
