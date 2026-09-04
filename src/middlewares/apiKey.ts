@@ -1,6 +1,27 @@
+import argon2 from "argon2";
 import { NextFunction, Request, Response } from "express";
-export const apiKey = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.header("x-nexus-api-key")?.startsWith("nx_live_"))
+
+import { prisma } from "../shared/prisma";
+
+export const apiKey = async (req: Request, res: Response, next: NextFunction) => {
+  const secret = req.header("x-nexus-api-key");
+
+  if (!secret?.startsWith("nx_live_")) {
     return res.status(401).json({ success: false, message: "X-NEXUS-API-KEY is required" });
-  next();
+  }
+
+  const candidates = await prisma.apiKey.findMany({
+    where: { prefix: secret.slice(0, 16), revokedAt: null },
+  });
+  const matches = await Promise.all(
+    candidates.map(async (candidate) =>
+      (await argon2.verify(candidate.keyHash, secret)) ? candidate : null,
+    ),
+  );
+  const key = matches.find(Boolean);
+
+  if (!key) return res.status(401).json({ success: false, message: "Invalid API key" });
+
+  await prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+  return next();
 };

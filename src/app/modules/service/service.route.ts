@@ -14,3 +14,4 @@ serviceRoutes.get(
   c.dependencies,
 );
 serviceRoutes.post("/:id/dependencies", auth(Role.OWNER, Role.ADMIN), c.addDependency);
+serviceRoutes.post("/:id/api-keys", auth(Role.OWNER, Role.ADMIN), c.createApiKey);
