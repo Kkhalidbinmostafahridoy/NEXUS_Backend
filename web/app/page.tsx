@@ -1,0 +1,3 @@
+import { api } from '../lib/api';
+type ApiResponse<T> = { data?: T };
+export default async function Dashboard() { let incidents: unknown[] = []; try { const response = await api<ApiResponse<unknown[]>>('/incidents'); incidents = response.data ?? []; } catch { /* Backend may require sign-in or be offline during frontend development. */ } return <main style={{ fontFamily: 'system-ui', maxWidth: 960, margin: '48px auto' }}><h1>NEXUS</h1><p>Next.js dashboard connected to the Express + TypeScript API.</p><section><h2>Open incidents</h2><p>{incidents.length} incident(s) returned by the API.</p></section></main>; }

@@ -1,0 +1,16 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    command: redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --node-id 0 --check=false --kafka-addr PLAINTEXT://0.0.0.0:9092 --advertise-kafka-addr PLAINTEXT://localhost:9092
+    ports: ["9092:9092"]
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    ports: ["8123:8123", "9000:9000"]
+  ai-service:
+    build: ./ai-service
+    environment:
+      NEXUS_API_URL: http://host.docker.internal:3000/api/v1
+    ports: ["8000:8000"]

@@ -1,0 +1,35 @@
+{
+  "name": "nexus-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server",
+    "start:dev": "ts-node src/server.ts",
+    "format": "prettier --write \"{src,workers}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,workers}/**/*.ts\"",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "argon2": "^0.41.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "prettier": "^3.9.6",
+    "prisma": "^6.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

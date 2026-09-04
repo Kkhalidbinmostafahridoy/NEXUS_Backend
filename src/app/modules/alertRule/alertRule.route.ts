@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { Role } from "@prisma/client";
+import { auth } from "../../../middlewares/auth";
+import { alertRuleController as c } from "./alertRule.controller";
+export const alertRuleRoutes = Router();
+alertRuleRoutes.post("/", auth(Role.OWNER, Role.ADMIN), c.create);
+alertRuleRoutes.get("/", auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER), c.list);
+alertRuleRoutes.patch("/:id", auth(Role.OWNER, Role.ADMIN), c.update);
+alertRuleRoutes.post("/:id/enable", auth(Role.OWNER, Role.ADMIN), c.enable);
+alertRuleRoutes.post("/:id/disable", auth(Role.OWNER, Role.ADMIN), c.disable);

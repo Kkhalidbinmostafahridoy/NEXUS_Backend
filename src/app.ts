@@ -1,0 +1,13 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import { apiRoutes } from "./routes";
+import { errorHandler } from "./middlewares/errorHandler";
+const app = express();
+app.use(helmet());
+app.use(cors({ origin: process.env.NEXT_PUBLIC_WEB_URL?.split(",") ?? true, credentials: true }));
+app.use(express.json());
+app.get("/health", (_q, r) => r.json({ status: "ok" }));
+app.use("/api/v1", apiRoutes);
+app.use(errorHandler);
+export default app;

@@ -1,0 +1,339 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum Severity {
+  P1
+  P2
+  P3
+  P4
+}
+
+enum IncidentStatus {
+  OPEN
+  ACKNOWLEDGED
+  INVESTIGATING
+  MITIGATING
+  RESOLVED
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id               String     @id @default(cuid())
+  name             String
+  email            String     @unique
+  passwordHash     String
+  role             Role       @default(MEMBER)
+  status           UserStatus @default(ACTIVE)
+  refreshTokenHash String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrganizationMember {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String
+  role           Role   @default(MEMBER)
+
+  @@unique([organizationId, userId])
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime @default(now())
+}
+
+model TeamMember {
+  teamId String
+  userId String
+
+  @@id([teamId, userId])
+}
+
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  environment String   @default("production")
+  repository  String?
+  projectId   String
+  teamId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, name, environment])
+}
+
+model ServiceDependency {
+  id                 String @id @default(cuid())
+  serviceId          String
+  dependsOnServiceId String
+  type               String
+
+  @@unique([serviceId, dependsOnServiceId])
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  name           String
+  keyHash        String    @unique
+  prefix         String
+  serviceId      String?
+  organizationId String
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
+}
+
+model AlertRule {
+  id        String   @id @default(cuid())
+  serviceId String
+  name      String
+  metric    String
+  operator  String
+  threshold Float
+  duration  Int
+  severity  Severity
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Alert {
+  id             String      @id @default(cuid())
+  serviceId      String
+  ruleId         String?
+  title          String
+  severity       Severity
+  status         AlertStatus @default(OPEN)
+  payload        Json?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  createdAt      DateTime    @default(now())
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  number      Int            @unique @default(autoincrement())
+  title       String
+  description String?
+  severity    Severity
+  status      IncidentStatus @default(OPEN)
+  assigneeId  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+}
+
+model IncidentService {
+  incidentId String
+  serviceId  String
+
+  @@id([incidentId, serviceId])
+}
+
+model IncidentEvent {
+  id         String   @id @default(cuid())
+  incidentId String
+  type       String
+  message    String
+  metadata   Json?
+  actorId    String?
+  createdAt  DateTime @default(now())
+}
+
+model Deployment {
+  id          String   @id @default(cuid())
+  serviceId   String
+  version     String
+  commitSha   String?
+  environment String
+  status      String   @default("DEPLOYED")
+  metadata    Json?
+  deployedAt  DateTime @default(now())
+}
+
+model Anomaly {
+  id         String   @id @default(cuid())
+  serviceId  String
+  metric     String
+  method     String
+  score      Float
+  observed   Float
+  expected   Float?
+  detectedAt DateTime @default(now())
+  metadata   Json?
+}
+
+model Correlation {
+  id         String   @id @default(cuid())
+  incidentId String?
+  summary    String
+  confidence Float
+  signals    Json
+  createdAt  DateTime @default(now())
+}
+
+model AiInvestigation {
+  id          String    @id @default(cuid())
+  incidentId  String
+  status      String    @default("COMPLETED")
+  summary     String?
+  rootCause   String?
+  confidence  Float?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+model AiEvidence {
+  id              String   @id @default(cuid())
+  investigationId String
+  type            String
+  reference       String
+  content         Json?
+  createdAt       DateTime @default(now())
+}
+
+model AiRecommendation {
+  id              String               @id @default(cuid())
+  investigationId String
+  action          String
+  reason          String
+  confidence      Float
+  status          RecommendationStatus @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+}
+
+model Runbook {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  serviceId   String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  sourceUrl String?
+  createdAt DateTime @default(now())
+}
+
+model SloDefinition {
+  id         String   @id @default(cuid())
+  serviceId  String
+  name       String
+  objective  Float
+  windowDays Int
+  indicator  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SloMeasurement {
+  id                   String   @id @default(cuid())
+  sloId                String
+  value                Float
+  errorBudgetRemaining Float
+  measuredAt           DateTime @default(now())
+}
+
+model Postmortem {
+  id             String   @id @default(cuid())
+  incidentId     String   @unique
+  impact         String?
+  rootCause      String?
+  resolution     String?
+  lessonsLearned Json?
+  actionItems    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ChaosExperiment {
+  id              String    @id @default(cuid())
+  name            String
+  targetServiceId String
+  type            String
+  duration        Int
+  value           Float
+  status          String    @default("DRAFT")
+  startedAt       DateTime?
+  stoppedAt       DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  channel   String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([resource, resourceId])
+}

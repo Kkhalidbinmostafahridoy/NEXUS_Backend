@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { Role } from "@prisma/client";
+import { auth } from "../../../middlewares/auth";
+import { projectController as c } from "./project.controller";
+export const projectRoutes = Router();
+projectRoutes.post("/", auth(Role.OWNER, Role.ADMIN), c.create);
+projectRoutes.get("/", auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER), c.list);
+projectRoutes.get("/:id", auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER), c.get);
+projectRoutes.patch("/:id", auth(Role.OWNER, Role.ADMIN), c.update);
+projectRoutes.delete("/:id", auth(Role.OWNER, Role.ADMIN), c.remove);
