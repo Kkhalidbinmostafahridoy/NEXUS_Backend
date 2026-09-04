@@ -12,15 +12,39 @@ const organizationId = (request: AuthRequest) => {
 
 export const documentController = {
   create: catchAsync(async (request: AuthRequest, response) => {
-    sendResponse(response, 201, "Document created", await documentService.create(organizationId(request), request.body));
+    sendResponse(
+      response,
+      201,
+      "Document created",
+      await documentService.create(organizationId(request), request.body),
+    );
   }),
   list: catchAsync(async (request: AuthRequest, response) => {
-    sendResponse(response, 200, "Documents retrieved", await documentService.list(organizationId(request)));
+    sendResponse(
+      response,
+      200,
+      "Documents retrieved",
+      await documentService.list(organizationId(request)),
+    );
   }),
   get: catchAsync(async (request: AuthRequest, response) => {
-    sendResponse(response, 200, "Document retrieved", await documentService.get(String(request.params.id), organizationId(request)));
+    sendResponse(
+      response,
+      200,
+      "Document retrieved",
+      await documentService.get(String(request.params.id), organizationId(request)),
+    );
   }),
   update: catchAsync(async (request: AuthRequest, response) => {
-    sendResponse(response, 200, "Document updated", await documentService.update(String(request.params.id), organizationId(request), request.body));
+    sendResponse(
+      response,
+      200,
+      "Document updated",
+      await documentService.update(
+        String(request.params.id),
+        organizationId(request),
+        request.body,
+      ),
+    );
   }),
 };

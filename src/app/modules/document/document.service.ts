@@ -48,7 +48,8 @@ export const documentService = {
       data: {
         title: data.title ? String(data.title) : undefined,
         content: data.content ? String(data.content) : undefined,
-        sourceUrl: data.sourceUrl === null ? null : data.sourceUrl ? String(data.sourceUrl) : undefined,
+        sourceUrl:
+          data.sourceUrl === null ? null : data.sourceUrl ? String(data.sourceUrl) : undefined,
       },
     });
   },
