@@ -10,7 +10,8 @@
     "format:check": "prettier --check \"{src,workers}/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "test": "jest"
+    "test": "jest",
+    "worker:ai": "ts-node workers/ai.worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

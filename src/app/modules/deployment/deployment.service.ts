@@ -1,4 +1,6 @@
 import { prisma } from "../../../shared/prisma";
+import { createEvent, eventTopics } from "../../../contracts/events";
+import { eventProducer } from "../../../shared/kafka/producer";
 import { tenantService } from "../tenant.service";
 
 export const deploymentService = {
@@ -60,6 +62,17 @@ export const deploymentService = {
         });
       }),
     );
+
+    void eventProducer
+      .publish(
+        eventTopics.deploymentCreated,
+        createEvent(eventTopics.deploymentCreated, organizationId, {
+          deploymentId: deployment.id,
+          serviceId,
+          version: deployment.version,
+        }),
+      )
+      .catch(() => undefined);
 
     return deployment;
   },

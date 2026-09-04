@@ -1,4 +1,6 @@
 import { prisma } from "../../../shared/prisma";
+import { createEvent, eventTopics } from "../../../contracts/events";
+import { eventProducer } from "../../../shared/kafka/producer";
 import { tenantService } from "../tenant.service";
 
 export const aiService = {
@@ -6,12 +8,24 @@ export const aiService = {
     const incidentId = String(data.incidentId || "");
     await tenantService.incident(incidentId, organizationId);
 
-    return prisma.aiInvestigation.create({
+    const investigation = await prisma.aiInvestigation.create({
       data: {
         incidentId,
         status: "PENDING",
       },
     });
+
+    void eventProducer
+      .publish(
+        eventTopics.aiInvestigationRequested,
+        createEvent(eventTopics.aiInvestigationRequested, organizationId, {
+          investigationId: investigation.id,
+          incidentId,
+        }),
+      )
+      .catch(() => undefined);
+
+    return investigation;
   },
 
   async get(id: string, organizationId: string) {

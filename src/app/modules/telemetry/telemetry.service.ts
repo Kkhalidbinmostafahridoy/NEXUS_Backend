@@ -1,6 +1,7 @@
 import { AlertStatus, Prisma, Severity } from "@prisma/client";
 
 import { prisma } from "../../../shared/prisma";
+import { clickhouseClient } from "../../../shared/clickhouse/client";
 import { incidentService } from "../incident/incident.service";
 import { sloService } from "../slo/slo.service";
 import { tenantService } from "../tenant.service";
@@ -112,6 +113,7 @@ export const telemetryService = {
         payload: record as Prisma.InputJsonValue,
       })),
     });
+    void clickhouseClient.writeTelemetry(accepted).catch(() => undefined);
 
     if (kind === "metrics") {
       await Promise.all(accepted.map((metric) => this.evaluateMetric(metric)));
