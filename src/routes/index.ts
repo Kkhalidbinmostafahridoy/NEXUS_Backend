@@ -24,6 +24,15 @@ import userRoutes from "./user";
 
 const router = Router();
 
+router.get("/", (_request, response) =>
+  response.json({
+    status: "ok",
+    service: "NEXUS API",
+    version: "v1",
+    documentation: "/openapi.json",
+  }),
+);
+
 const moduleRoutes = [
   { path: "/auth", route: authRoutes },
   { path: "/users", route: userRoutes },

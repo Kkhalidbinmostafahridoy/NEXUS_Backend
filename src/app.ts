@@ -22,6 +22,15 @@ app.use(helmet());
 app.use(cors({ origin: process.env.NEXT_PUBLIC_WEB_URL?.split(",") ?? true, credentials: true }));
 app.use(express.json({ limit: "1mb", strict: true }));
 app.use(strictRequestBody);
+app.get("/", (_request, response) =>
+  response.json({
+    status: "ok",
+    service: "NEXUS API",
+    health: "/health",
+    openApi: "/openapi.json",
+    basePath: "/api/v1",
+  }),
+);
 app.get("/health", (_q, r) => r.json({ status: "ok" }));
 app.get("/openapi.json", (_q, r) => r.json(openApiDocument));
 app.use(auditLog);
