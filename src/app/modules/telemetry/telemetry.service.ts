@@ -1,7 +1,9 @@
-import { AlertStatus, Severity } from "@prisma/client";
+import { AlertStatus, Prisma, Severity } from "@prisma/client";
 
 import { prisma } from "../../../shared/prisma";
 import { incidentService } from "../incident/incident.service";
+import { sloService } from "../slo/slo.service";
+import { tenantService } from "../tenant.service";
 
 export type TelemetryKind = "logs" | "metrics" | "traces";
 
@@ -12,12 +14,6 @@ export type TelemetryRecord = {
   timestamp: string;
   receivedAt: string;
   [key: string]: unknown;
-};
-
-const records: Record<TelemetryKind, TelemetryRecord[]> = {
-  logs: [],
-  metrics: [],
-  traces: [],
 };
 
 const compares = {
@@ -46,36 +42,107 @@ const asTelemetryRecord = (
   };
 };
 
+const fromDatabase = (event: {
+  id: string;
+  kind: string;
+  serviceId: string;
+  timestamp: Date;
+  receivedAt: Date;
+  payload: Prisma.JsonValue;
+}): TelemetryRecord => ({
+  ...(event.payload as Record<string, unknown>),
+  id: event.id,
+  kind: event.kind as TelemetryKind,
+  serviceId: event.serviceId,
+  timestamp: event.timestamp.toISOString(),
+  receivedAt: event.receivedAt.toISOString(),
+});
+
 export const telemetryService = {
-  list(kind: TelemetryKind, serviceId?: string) {
-    return serviceId
-      ? records[kind].filter((record) => record.serviceId === serviceId)
-      : records[kind];
+  async list(kind: TelemetryKind, organizationId: string, serviceId?: string) {
+    const serviceIds = await tenantService.serviceIds(organizationId);
+
+    if (serviceId && !serviceIds.includes(serviceId)) {
+      throw Object.assign(new Error("Service does not belong to the active organization."), {
+        statusCode: 403,
+      });
+    }
+
+    const events = await prisma.telemetryEvent.findMany({
+      where: {
+        kind,
+        serviceId: serviceId
+          ? serviceId
+          : {
+              in: serviceIds,
+            },
+      },
+      orderBy: {
+        timestamp: "desc",
+      },
+      take: 500,
+    });
+
+    return events.map(fromDatabase);
   },
 
-  async ingest(kind: TelemetryKind, payloads: Record<string, unknown>[]) {
+  async ingest(
+    kind: TelemetryKind,
+    payloads: Record<string, unknown>[],
+    apiKey: { organizationId: string; serviceId: string | null },
+  ) {
     const accepted = payloads.map((payload) => asTelemetryRecord(kind, payload));
-    records[kind].push(...accepted);
+
+    for (const record of accepted) {
+      if (apiKey.serviceId && apiKey.serviceId !== record.serviceId) {
+        throw Object.assign(new Error("API key is not authorized for this service."), {
+          statusCode: 403,
+        });
+      }
+      await tenantService.service(record.serviceId, apiKey.organizationId);
+    }
+
+    await prisma.telemetryEvent.createMany({
+      data: accepted.map((record) => ({
+        id: record.id,
+        kind: record.kind,
+        serviceId: record.serviceId,
+        timestamp: new Date(record.timestamp),
+        receivedAt: new Date(record.receivedAt),
+        payload: record as Prisma.InputJsonValue,
+      })),
+    });
 
     if (kind === "metrics") {
       await Promise.all(accepted.map((metric) => this.evaluateMetric(metric)));
     }
 
-    return { accepted: accepted.length, events: accepted };
+    return {
+      accepted: accepted.length,
+      events: accepted,
+    };
   },
 
   async evaluateMetric(metric: TelemetryRecord) {
     if (typeof metric.metric !== "string" || typeof metric.value !== "number") return;
 
-    const history = records.metrics
-      .filter(
-        (record) =>
-          record.serviceId === metric.serviceId &&
-          record.metric === metric.metric &&
-          typeof record.value === "number",
-      )
-      .slice(-21);
-    const baseline = history.slice(0, -1).map((record) => Number(record.value));
+    await sloService.calculateForMetric(metric.serviceId, metric.metric, metric.value);
+
+    const history = await prisma.telemetryEvent.findMany({
+      where: {
+        kind: "metrics",
+        serviceId: metric.serviceId,
+      },
+      orderBy: {
+        timestamp: "desc",
+      },
+      take: 21,
+    });
+    const values = history
+      .map(fromDatabase)
+      .filter((record) => record.metric === metric.metric && typeof record.value === "number")
+      .reverse();
+    const baseline = values.slice(0, -1).map((record) => Number(record.value));
 
     if (baseline.length >= 5) {
       const mean = baseline.reduce((total, value) => total + value, 0) / baseline.length;
@@ -93,14 +160,20 @@ export const telemetryService = {
             score,
             observed: Number(metric.value),
             expected: mean,
-            metadata: { sampleSize: baseline.length },
+            metadata: {
+              sampleSize: baseline.length,
+            },
           },
         });
       }
     }
 
     const rules = await prisma.alertRule.findMany({
-      where: { serviceId: metric.serviceId, metric: metric.metric, enabled: true },
+      where: {
+        serviceId: metric.serviceId,
+        metric: metric.metric,
+        enabled: true,
+      },
     });
 
     for (const rule of rules) {
@@ -108,7 +181,12 @@ export const telemetryService = {
       if (!compare || !compare(Number(metric.value), rule.threshold)) continue;
 
       const recent = await prisma.alert.findFirst({
-        where: { ruleId: rule.id, status: { in: [AlertStatus.OPEN, AlertStatus.ACKNOWLEDGED] } },
+        where: {
+          ruleId: rule.id,
+          status: {
+            in: [AlertStatus.OPEN, AlertStatus.ACKNOWLEDGED],
+          },
+        },
       });
       if (recent) continue;
 
@@ -118,7 +196,11 @@ export const telemetryService = {
           ruleId: rule.id,
           title: rule.name,
           severity: rule.severity,
-          payload: { metric: metric.metric, value: metric.value, threshold: rule.threshold },
+          payload: {
+            metric: metric.metric,
+            value: metric.value,
+            threshold: rule.threshold,
+          },
         },
       });
 

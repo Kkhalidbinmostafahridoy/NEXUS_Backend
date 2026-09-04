@@ -6,12 +6,62 @@ export const deploymentService = {
     const serviceId = String(data.serviceId || "");
     await tenantService.service(serviceId, organizationId);
 
-    return prisma.deployment.create({
+    const deployment = await prisma.deployment.create({
       data: {
         ...data,
         serviceId,
       } as never,
     });
+
+    const incidentLinks = await prisma.incidentService.findMany({
+      where: {
+        serviceId,
+      },
+      select: {
+        incidentId: true,
+      },
+    });
+    const activeIncidents = await prisma.incident.findMany({
+      where: {
+        id: {
+          in: incidentLinks.map((link) => link.incidentId),
+        },
+        status: {
+          in: ["OPEN", "ACKNOWLEDGED", "INVESTIGATING", "MITIGATING"],
+        },
+      },
+    });
+
+    await Promise.all(
+      activeIncidents.map(async (incident) => {
+        await prisma.incidentEvent.create({
+          data: {
+            incidentId: incident.id,
+            type: "DEPLOYMENT_CORRELATED",
+            message: `Deployment ${deployment.id} (${deployment.version}) correlated with this incident.`,
+            metadata: {
+              deploymentId: deployment.id,
+              serviceId,
+              version: deployment.version,
+            },
+          },
+        });
+        await prisma.correlation.create({
+          data: {
+            incidentId: incident.id,
+            summary: `Deployment ${deployment.version} was observed during the active incident.`,
+            confidence: 0.6,
+            signals: {
+              deploymentId: deployment.id,
+              serviceId,
+              version: deployment.version,
+            },
+          },
+        });
+      }),
+    );
+
+    return deployment;
   },
 
   async list(organizationId: string) {

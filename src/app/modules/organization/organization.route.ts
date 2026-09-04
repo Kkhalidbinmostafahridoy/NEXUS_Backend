@@ -1,16 +1,30 @@
-import { Router } from "express";
 import { Role } from "@prisma/client";
+import { Router } from "express";
+
 import { auth } from "../../../middlewares/auth";
-import { organizationController as c } from "./organization.controller";
+import { organizationController } from "./organization.controller";
+
 export const organizationRoutes = Router();
-organizationRoutes.post("/", auth(Role.OWNER, Role.ADMIN), c.create);
-organizationRoutes.get("/", auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER), c.list);
-organizationRoutes.get("/:id", auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER), c.get);
-organizationRoutes.patch("/:id", auth(Role.OWNER, Role.ADMIN), c.update);
-organizationRoutes.delete("/:id", auth(Role.OWNER), c.remove);
+
+organizationRoutes.post("/", auth(), organizationController.create);
+organizationRoutes.get(
+  "/",
+  auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER),
+  organizationController.list,
+);
+organizationRoutes.get(
+  "/:id",
+  auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER),
+  organizationController.get,
+);
+organizationRoutes.patch("/:id", auth(Role.OWNER), organizationController.update);
 organizationRoutes.get(
   "/:id/members",
   auth(Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER),
-  c.members,
+  organizationController.members,
 );
-organizationRoutes.post("/:id/members", auth(Role.OWNER, Role.ADMIN), c.addMember);
+organizationRoutes.post(
+  "/:id/members",
+  auth(Role.OWNER, Role.ADMIN),
+  organizationController.addMember,
+);

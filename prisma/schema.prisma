@@ -214,6 +214,17 @@ model Anomaly {
   metadata   Json?
 }
 
+model TelemetryEvent {
+  id         String   @id @default(cuid())
+  kind       String
+  serviceId  String
+  timestamp  DateTime
+  payload    Json
+  receivedAt DateTime @default(now())
+
+  @@index([serviceId, kind, timestamp])
+}
+
 model Correlation {
   id         String   @id @default(cuid())
   incidentId String?

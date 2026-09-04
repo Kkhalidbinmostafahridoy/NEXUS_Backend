@@ -17,4 +17,9 @@ Operational-intelligence backend for telemetry, alerts, incidents, investigation
 
 All business routes begin at `/api/v1`. Register first, then send `Authorization: Bearer <accessToken>` for protected endpoints. SDK ingestion uses `X-NEXUS-API-KEY`.
 
+Telemetry API keys are service-scoped: every ingested event must contain the matching
+`serviceId`. Telemetry is stored durably in PostgreSQL and can later be mirrored to ClickHouse.
+For automatic SLO calculation, set the SLO `indicator` to the telemetry metric name and submit
+metric events with `good: false` (or an HTTP `status >= 500`) for failed samples.
+
 The API is deliberately event-oriented: writes publish domain events to the in-process event bus now, whose `EventPublisher` can be switched to Redpanda without changing controllers.

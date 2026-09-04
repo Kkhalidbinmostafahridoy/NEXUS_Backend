@@ -83,4 +83,58 @@ export const sloService = {
       },
     });
   },
+
+  async calculateForMetric(serviceId: string, metric: string, value: number) {
+    const definitions = await prisma.sloDefinition.findMany({
+      where: {
+        serviceId,
+        indicator: metric,
+      },
+    });
+    if (!definitions.length) return [];
+
+    return Promise.all(
+      definitions.map(async (definition) => {
+        const start = new Date();
+        start.setDate(start.getDate() - definition.windowDays);
+        const events = await prisma.telemetryEvent.findMany({
+          where: {
+            kind: "metrics",
+            serviceId,
+            timestamp: {
+              gte: start,
+            },
+          },
+          select: {
+            payload: true,
+          },
+        });
+        const samples = events
+          .map((event) => event.payload as Record<string, unknown>)
+          .filter((payload) => payload.metric === metric);
+        const good = samples.filter(
+          (payload) =>
+            payload.good !== false &&
+            (typeof payload.status !== "number" || (payload.status >= 200 && payload.status < 500)),
+        ).length;
+        const achieved = samples.length ? good / samples.length : 1;
+        const objective =
+          definition.objective > 1 ? definition.objective / 100 : definition.objective;
+        const errorBudgetRemaining =
+          objective >= 1
+            ? achieved >= objective
+              ? 100
+              : 0
+            : Math.max(0, Math.min(100, ((achieved - objective) / (1 - objective)) * 100));
+
+        return prisma.sloMeasurement.create({
+          data: {
+            sloId: definition.id,
+            value: achieved * 100,
+            errorBudgetRemaining,
+          },
+        });
+      }),
+    );
+  },
 };

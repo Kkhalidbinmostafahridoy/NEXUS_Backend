@@ -3,7 +3,15 @@ import { NextFunction, Request, Response } from "express";
 
 import { prisma } from "../shared/prisma";
 
-export const apiKey = async (req: Request, res: Response, next: NextFunction) => {
+export type ApiKeyRequest = Request & {
+  apiKey?: {
+    id: string;
+    organizationId: string;
+    serviceId: string | null;
+  };
+};
+
+export const apiKey = async (req: ApiKeyRequest, res: Response, next: NextFunction) => {
   const secret = req.header("x-nexus-api-key");
 
   if (!secret?.startsWith("nx_live_")) {
@@ -23,5 +31,10 @@ export const apiKey = async (req: Request, res: Response, next: NextFunction) =>
   if (!key) return res.status(401).json({ success: false, message: "Invalid API key" });
 
   await prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+  req.apiKey = {
+    id: key.id,
+    organizationId: key.organizationId,
+    serviceId: key.serviceId,
+  };
   return next();
 };
