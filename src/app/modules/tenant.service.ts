@@ -36,4 +36,24 @@ export const tenantService = {
     });
     return services.map((service) => service.id);
   },
+
+  async organizationIdForService(serviceId: string) {
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+      select: { projectId: true },
+    });
+    if (!service) {
+      throw Object.assign(new Error("Service was not found."), { statusCode: 404 });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: service.projectId },
+      select: { organizationId: true },
+    });
+    if (!project) {
+      throw Object.assign(new Error("Project was not found."), { statusCode: 404 });
+    }
+
+    return project.organizationId;
+  },
 };

@@ -1,8 +1,9 @@
-import { AlertStatus, Prisma, Severity } from "@prisma/client";
+import { AlertStatus, Prisma } from "@prisma/client";
 
+import { eventTopics } from "../../../contracts/events";
+import { publishDomainEvent } from "../../../shared/events/publisher";
 import { prisma } from "../../../shared/prisma";
 import { clickhouseClient } from "../../../shared/clickhouse/client";
-import { incidentService } from "../incident/incident.service";
 import { sloService } from "../slo/slo.service";
 import { tenantService } from "../tenant.service";
 
@@ -68,6 +69,12 @@ export const telemetryService = {
         statusCode: 403,
       });
     }
+
+    const scopedServiceIds = serviceId ? [serviceId] : serviceIds;
+    const clickhouseResults = await clickhouseClient
+      .queryTelemetry(kind, scopedServiceIds)
+      .catch(() => null);
+    if (clickhouseResults) return clickhouseResults;
 
     const events = await prisma.telemetryEvent.findMany({
       where: {
@@ -154,7 +161,7 @@ export const telemetryService = {
       const score = deviation === 0 ? 0 : Math.abs((Number(metric.value) - mean) / deviation);
 
       if (score >= 3) {
-        await prisma.anomaly.create({
+        const anomaly = await prisma.anomaly.create({
           data: {
             serviceId: metric.serviceId,
             metric: metric.metric,
@@ -166,6 +173,15 @@ export const telemetryService = {
               sampleSize: baseline.length,
             },
           },
+        });
+
+        const organizationId = await tenantService.organizationIdForService(metric.serviceId);
+        publishDomainEvent(eventTopics.anomalyDetected, organizationId, {
+          anomalyId: anomaly.id,
+          serviceId: metric.serviceId,
+          metric: metric.metric,
+          score,
+          observed: Number(metric.value),
         });
       }
     }
@@ -206,14 +222,14 @@ export const telemetryService = {
         },
       });
 
-      if (rule.severity === Severity.P1 || rule.severity === Severity.P2) {
-        await incidentService.findOrCreateForAlert(
-          metric.serviceId,
-          `${rule.name}: ${metric.serviceId}`,
-          rule.severity,
-          alert.id,
-        );
-      }
+      const organizationId = await tenantService.organizationIdForService(metric.serviceId);
+      publishDomainEvent(eventTopics.alertTriggered, organizationId, {
+        alertId: alert.id,
+        serviceId: metric.serviceId,
+        ruleId: rule.id,
+        severity: rule.severity,
+        title: alert.title,
+      });
     }
   },
 };

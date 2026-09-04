@@ -1,6 +1,9 @@
 import { IncidentStatus, Prisma, Severity } from "@prisma/client";
 
+import { eventTopics } from "../../../contracts/events";
+import { publishDomainEvent } from "../../../shared/events/publisher";
 import { prisma } from "../../../shared/prisma";
+import { notificationService } from "../notification/notification.service";
 import { tenantService } from "../tenant.service";
 
 type CreateIncidentInput = {
@@ -63,6 +66,22 @@ export const incidentService = {
         },
       });
 
+      publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+        incidentId: incident.id,
+        changeType: "created",
+        status: incident.status,
+        severity: incident.severity,
+      });
+
+      if (input.severity === Severity.P1 || input.severity === Severity.P2) {
+        notificationService.request(organizationId, {
+          channel: "in_app",
+          title: `Incident #${incident.number}: ${incident.title}`,
+          body: `A ${input.severity} incident was created and requires attention.`,
+          incidentId: incident.id,
+        });
+      }
+
       return incident;
     });
   },
@@ -114,6 +133,13 @@ export const incidentService = {
       "Incident details updated.",
     );
 
+    publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+      incidentId: id,
+      changeType: "updated",
+      status: incident.status,
+      severity: incident.severity,
+    });
+
     return incident;
   },
 
@@ -147,6 +173,14 @@ export const incidentService = {
       `Incident status changed from ${incident.status} to ${nextStatus}.`,
     );
 
+    publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+      incidentId: id,
+      changeType: "transition",
+      status: updated.status,
+      severity: updated.severity,
+      previousStatus: incident.status,
+    });
+
     return updated;
   },
 
@@ -173,6 +207,14 @@ export const incidentService = {
       "ASSIGNEE_CHANGED",
       assigneeId ? `Incident assigned to ${assigneeId}.` : "Incident assignment cleared.",
     );
+
+    publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+      incidentId: id,
+      changeType: "assign",
+      status: incident.status,
+      severity: incident.severity,
+      assigneeId,
+    });
 
     return incident;
   },
@@ -261,6 +303,15 @@ export const incidentService = {
         },
       });
 
+      const organizationId = await tenantService.organizationIdForService(serviceId);
+      publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+        incidentId: activeIncident.id,
+        changeType: "alert_correlated",
+        status: activeIncident.status,
+        severity: activeIncident.severity,
+        alertId,
+      });
+
       return {
         incident: activeIncident,
         created: false,
@@ -297,6 +348,25 @@ export const incidentService = {
 
       return created;
     });
+
+    const organizationId = await tenantService.organizationIdForService(serviceId);
+    publishDomainEvent(eventTopics.incidentUpdated, organizationId, {
+      incidentId: incident.id,
+      changeType: "created",
+      status: incident.status,
+      severity: incident.severity,
+      alertId,
+    });
+
+    if (severity === Severity.P1 || severity === Severity.P2) {
+      notificationService.request(organizationId, {
+        channel: "in_app",
+        title: `Incident #${incident.number}: ${incident.title}`,
+        body: `A ${severity} incident was created from alert ${alertId}.`,
+        incidentId: incident.id,
+        alertId,
+      });
+    }
 
     return {
       incident,

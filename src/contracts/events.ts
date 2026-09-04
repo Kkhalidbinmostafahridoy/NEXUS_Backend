@@ -5,6 +5,7 @@ export const eventTopics = {
   incidentUpdated: "nexus.incident.updated",
   aiInvestigationRequested: "nexus.ai.investigation.requested",
   notificationRequested: "nexus.notification.requested",
+  deadLetter: "nexus.dlq",
 } as const;
 
 export type EventTopic = (typeof eventTopics)[keyof typeof eventTopics];
